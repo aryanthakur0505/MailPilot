@@ -1,0 +1,187 @@
+// ==================================================
+// MailPilot — Prisma Schema
+// ==================================================
+// Phase 1: User, Account, Session (Auth.js compatible)
+// Phase 2: EmailAccount, Thread, Email (Gmail sync)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------
+// Auth.js Models
+// --------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  emailAccounts EmailAccount[]
+  drafts        AiDraft[]
+  tasks         Task[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// --------------------------------------------------
+// Phase 2: Email Sync Models
+// --------------------------------------------------
+
+/// A connected email provider account (Gmail or Outlook)
+model EmailAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // "google" | "microsoft"
+  email        String
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threads Thread[]
+  emails  Email[]
+
+  @@unique([userId, email])
+  @@map("email_accounts")
+}
+
+/// A conversation thread grouping multiple emails
+model Thread {
+  id             String   @id @default(cuid())
+  emailAccountId String
+  gmailThreadId  String
+  subject        String?
+  snippet        String?
+  lastMessageAt  DateTime?
+  unread         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  emails       Email[]
+
+  @@unique([emailAccountId, gmailThreadId])
+  @@map("threads")
+}
+
+/// A single email message
+model Email {
+  id             String    @id @default(cuid())
+  emailAccountId String
+  threadId       String
+  gmailId        String    @unique
+  from           String
+  fromName       String?
+  to             String
+  subject        String?
+  snippet        String?
+  body           String?   @db.Text
+  isRead         Boolean   @default(false)
+  isStarred      Boolean   @default(false)
+  labels         String[]  // e.g. ["INBOX", "UNREAD"]
+  receivedAt     DateTime
+  createdAt      DateTime  @default(now())
+
+  // Phase 3: AI enrichment fields
+  category       String?   // "work" | "personal" | "newsletter" | "receipt" | "social" | "spam" | "urgent"
+  priority       Int?      // 0–100 urgency score
+  summary        String?   @db.Text  // one-sentence AI summary
+  processedAt    DateTime? // null until AI worker completes
+
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  thread       Thread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  drafts       AiDraft[]
+  tasks        Task[]
+
+  @@map("emails")
+}
+
+// --------------------------------------------------
+// Phase 3: AI Models
+// --------------------------------------------------
+
+/// AI-generated reply draft for an email thread
+model AiDraft {
+  id        String   @id @default(cuid())
+  emailId   String
+  userId    String
+  subject   String?
+  body      String   @db.Text
+  tone      String   @default("professional") // "professional" | "casual" | "brief"
+  status    String   @default("draft")         // "draft" | "discarded"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_drafts")
+}
+
+/// Action item extracted from an email by AI
+model Task {
+  id        String    @id @default(cuid())
+  emailId   String
+  userId    String
+  title     String
+  dueDate   DateTime?
+  completed Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
