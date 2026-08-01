@@ -24,7 +24,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { EmailRowAiButton } from "@/components/dashboard/EmailRowAiButton";
 
 // -----------------------------------------------------------------------
@@ -112,6 +112,16 @@ export default async function DashboardPage() {
         }),
       ])
     : [0, 0];
+
+  // Phase 5: Pending tasks widget
+  const pendingTasks = session?.user?.id
+    ? await prisma.task.findMany({
+        where: { userId: session.user.id, completed: false },
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        take: 5,
+        include: { email: { select: { fromName: true, from: true } } },
+      })
+    : [];
 
   const stats = [
     {
@@ -739,7 +749,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* Recent AI Activity */}
+            {/* Phase 5: Pending Tasks Widget */}
             <div className="animate-fade-up delay-400" style={{ opacity: 0 }}>
               <div
                 className="rounded-2xl p-5"
@@ -750,60 +760,63 @@ export default async function DashboardPage() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                    AI Activity
+                    Pending Tasks
                   </h3>
-                  <button
-                    className="flex items-center gap-1 text-xs"
+                  <a
+                    href="/dashboard/tasks"
+                    className="flex items-center gap-1 text-xs transition-colors"
                     style={{ color: "var(--indigo-400)" }}
                   >
                     View all <ArrowRight size={11} />
-                  </button>
+                  </a>
                 </div>
 
-                <div className="space-y-3">
-                  {[
-                    {
-                      icon: CheckCircle2,
-                      color: "#34d399",
-                      text: `Synced ${emails.length} emails from Gmail`,
-                      time: emailAccount?.lastSyncedAt
-                        ? formatDistanceToNow(emailAccount.lastSyncedAt, { addSuffix: true })
-                        : "recently",
-                    },
-                    {
-                      icon: Brain,
-                      color: "var(--indigo-400)",
-                      text: "AI analysis ready on next sync",
-                      time: "soon",
-                    },
-                    {
-                      icon: Sparkles,
-                      color: "#a78bfa",
-                      text: "Draft generation available",
-                      time: "–",
-                    },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-start gap-3">
+                {pendingTasks.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: "var(--text-faint)" }}>
+                    No pending tasks — great work! 🎉
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingTasks.map((task) => (
                       <div
-                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+                        key={task.id}
+                        className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
                         style={{
-                          backgroundColor: `${item.color}15`,
-                          border: `1px solid ${item.color}25`,
+                          backgroundColor: "var(--bg-elevated)",
+                          border: "1px solid var(--border-subtle)",
                         }}
                       >
-                        <item.icon size={11} style={{ color: item.color }} strokeWidth={2.5} />
+                        <div
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full"
+                          style={{
+                            border: "1.5px solid var(--border-default)",
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="text-xs font-medium truncate"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            {task.title}
+                          </p>
+                          {task.email && (
+                            <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-faint)" }}>
+                              {task.email.fromName || task.email.from}
+                            </p>
+                          )}
+                        </div>
+                        {task.dueDate && (
+                          <span
+                            className="shrink-0 text-[10px] font-medium"
+                            style={{ color: "var(--text-faint)" }}
+                          >
+                            {format(task.dueDate, "MMM d")}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                          {item.text}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-[10px]" style={{ color: "var(--text-faint)" }}>
-                        {item.time}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

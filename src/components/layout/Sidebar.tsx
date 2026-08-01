@@ -18,6 +18,7 @@ import {
   FolderOpen,
   Star,
   PenSquare,
+  Zap,
 } from "lucide-react";
 
 const navItems = [
@@ -31,6 +32,7 @@ const navItems = [
 const aiItems = [
   { label: "AI Drafts", href: "/dashboard/ai-drafts", icon: Sparkles },
   { label: "Tasks", href: "/dashboard/tasks", icon: ListTodo },
+  { label: "Rules", href: "/dashboard/rules", icon: Zap },
   { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
 ];
 

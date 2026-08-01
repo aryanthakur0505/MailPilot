@@ -7,8 +7,10 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
 import { PrismaClient } from "@prisma/client";
+import { google } from "googleapis";
 import { connection } from "../src/lib/queue";
-import { classifyEmail, generateDraft, extractTasks } from "../src/lib/ai";
+import { classifyEmail, generateDraft, extractTasks, analyzeWritingStyle, generateEmbedding } from "../src/lib/ai";
+import { fetchSentEmails } from "../src/lib/gmail";
 import type { EmailJobData } from "../src/lib/queue";
 
 const prisma = new PrismaClient();
@@ -52,6 +54,82 @@ const worker = new Worker<EmailJobData>(
       });
 
       console.log(`[worker] Classified email ${emailId}: ${result.category} (priority: ${result.priority})`);
+
+      // ── Phase 7: Rule Evaluation ─────────────────────────────────────
+      const activeRules = await prisma.rule.findMany({
+        where: { userId, isActive: true },
+      });
+
+      const matchedRules = activeRules.filter(
+        (r) => r.conditionField === "category" && r.conditionValue === result.category
+      );
+
+      if (matchedRules.length > 0) {
+        // Fetch the email's Gmail ID and the user's OAuth token
+        const emailRecord = await prisma.email.findUnique({
+          where: { id: emailId },
+          select: { gmailId: true },
+        });
+        const account = await prisma.account.findFirst({
+          where: { userId, provider: "google" },
+          select: { access_token: true, refresh_token: true },
+        });
+
+        if (emailRecord && account?.access_token) {
+          const auth = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+          );
+          auth.setCredentials({
+            access_token: account.access_token,
+            refresh_token: account.refresh_token ?? undefined,
+          });
+          const gmail = google.gmail({ version: "v1", auth });
+
+          for (const rule of matchedRules) {
+            try {
+              if (rule.actionType === "archive") {
+                await gmail.users.messages.modify({
+                  userId: "me",
+                  id: emailRecord.gmailId,
+                  requestBody: { removeLabelIds: ["INBOX"] },
+                });
+                console.log(`[worker] Rule "${rule.name}": Archived email ${emailRecord.gmailId}`);
+              } else if (rule.actionType === "markRead") {
+                await gmail.users.messages.modify({
+                  userId: "me",
+                  id: emailRecord.gmailId,
+                  requestBody: { removeLabelIds: ["UNREAD"] },
+                });
+                console.log(`[worker] Rule "${rule.name}": Marked email ${emailRecord.gmailId} as read`);
+              } else if (rule.actionType === "addLabel" && rule.actionValue) {
+                // Look up or create the label ID
+                const labelsRes = await gmail.users.labels.list({ userId: "me" });
+                const existing = labelsRes.data.labels?.find(
+                  (l) => l.name?.toLowerCase() === rule.actionValue!.toLowerCase()
+                );
+                const labelId = existing?.id ?? (
+                  await gmail.users.labels.create({
+                    userId: "me",
+                    requestBody: { name: rule.actionValue },
+                  })
+                ).data.id;
+
+                if (labelId) {
+                  await gmail.users.messages.modify({
+                    userId: "me",
+                    id: emailRecord.gmailId,
+                    requestBody: { addLabelIds: [labelId] },
+                  });
+                  console.log(`[worker] Rule "${rule.name}": Added label "${rule.actionValue}" to email ${emailRecord.gmailId}`);
+                }
+              }
+            } catch (ruleErr) {
+              console.error(`[worker] Rule "${rule.name}" action failed:`, (ruleErr as Error).message);
+            }
+          }
+        }
+      }
     }
 
     // ── generate-draft ────────────────────────────────────────────────
@@ -68,10 +146,18 @@ const worker = new Worker<EmailJobData>(
         return;
       }
 
+      // Fetch user's writing style for personalized draft
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { writingStyle: true },
+      });
+
       const result = await generateDraft(
         email.subject ?? "",
         email.fromName ?? "Unknown",
-        email.body ?? email.snippet ?? ""
+        email.body ?? email.snippet ?? "",
+        "professional",
+        user?.writingStyle ?? undefined
       );
 
       await prisma.aiDraft.create({
@@ -120,6 +206,81 @@ const worker = new Worker<EmailJobData>(
       } else {
         console.log(`[worker] No tasks found in email ${emailId}`);
       }
+    }
+
+    else if (type === "analyze-writing-style") {
+      // Fetch the user's Google OAuth tokens
+      const account = await prisma.account.findFirst({
+        where: { userId, provider: "google" },
+        select: { access_token: true, refresh_token: true },
+      });
+
+      if (!account?.access_token || !account?.refresh_token) {
+        console.warn(`[worker] No Google account for user ${userId}, skipping style analysis.`);
+        return;
+      }
+
+      console.log(`[worker] Fetching sent emails for user ${userId}...`);
+      const sentEmails = await fetchSentEmails(
+        account.access_token,
+        account.refresh_token,
+        30
+      );
+
+      if (sentEmails.length === 0) {
+        console.warn(`[worker] No sent emails found for user ${userId}, skipping.`);
+        return;
+      }
+
+      console.log(`[worker] Analyzing writing style from ${sentEmails.length} sent emails...`);
+      const { styleSummary } = await analyzeWritingStyle(
+        sentEmails.map((e) => `Subject: ${e.subject}\n\n${e.body}`)
+      );
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          writingStyle: styleSummary,
+          styleAnalyzedAt: new Date(),
+        },
+      });
+
+      console.log(`[worker] ✅ Writing style saved for user ${userId}: "${styleSummary.slice(0, 80)}..."`);
+    }
+
+    else if (type === "generate-embedding") {
+      const { emailId } = payload as { emailId: string };
+
+      const email = await prisma.email.findUnique({
+        where: { id: emailId },
+        select: { subject: true, body: true, snippet: true },
+      });
+
+      if (!email) {
+        console.warn(`[worker] Email ${emailId} not found for embedding, skipping.`);
+        return;
+      }
+
+      // Strip basic HTML tags and build a clean text blob
+      const rawText = `${email.subject ?? ""} ${email.body ?? email.snippet ?? ""}`;
+      const cleanText = rawText.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+      if (cleanText.length < 10) {
+        console.warn(`[worker] Email ${emailId} has no usable text for embedding, skipping.`);
+        return;
+      }
+
+      const vector = await generateEmbedding(cleanText);
+      const vectorStr = `[${vector.join(",")}]`;
+
+      // Use raw SQL to update the vector column (Prisma doesn't support vector type natively)
+      await prisma.$executeRaw`
+        UPDATE emails
+        SET embedding = ${vectorStr}::vector
+        WHERE id = ${emailId}
+      `;
+
+      console.log(`[worker] ✅ Embedding generated for email ${emailId} (${vector.length} dims)`);
     }
 
     else {

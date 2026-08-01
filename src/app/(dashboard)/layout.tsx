@@ -5,6 +5,7 @@
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { ChatWidget } from "@/components/dashboard/ChatWidget";
 
 export default function DashboardLayout({
   children,
@@ -32,6 +33,9 @@ export default function DashboardLayout({
       >
         <div className="p-8 animate-fade-up">{children}</div>
       </main>
+
+      {/* Phase 8: Floating chat widget */}
+      <ChatWidget />
     </div>
   );
 }

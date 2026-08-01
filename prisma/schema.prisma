@@ -5,12 +5,14 @@
 // Phase 2: EmailAccount, Thread, Email (Gmail sync)
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 // --------------------------------------------------
@@ -18,19 +20,24 @@ datasource db {
 // --------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Phase 6: Writing style personalization
+  writingStyle      String?   @db.Text  // AI-extracted style profile
+  styleAnalyzedAt   DateTime?           // when style was last analyzed
 
   accounts      Account[]
   sessions      Session[]
   emailAccounts EmailAccount[]
   drafts        AiDraft[]
   tasks         Task[]
+  rules         Rule[]
 
   @@map("users")
 }
@@ -139,6 +146,9 @@ model Email {
   summary        String?   @db.Text  // one-sentence AI summary
   processedAt    DateTime? // null until AI worker completes
 
+  // Phase 8: Semantic search embedding
+  embedding      Unsupported("vector(768)")? // Gemini text-embedding-004 produces 768-dim vectors
+
   emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
   thread       Thread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
   drafts       AiDraft[]
@@ -169,19 +179,46 @@ model AiDraft {
   @@map("ai_drafts")
 }
 
-/// Action item extracted from an email by AI
+/// Action item extracted from an email by AI, or manually added
 model Task {
   id        String    @id @default(cuid())
-  emailId   String
+  emailId   String?   // Optional — manual tasks have no source email
   userId    String
   title     String
   dueDate   DateTime?
   completed Boolean   @default(false)
   createdAt DateTime  @default(now())
 
-  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email Email? @relation(fields: [emailId], references: [id], onDelete: SetNull)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("tasks")
 }
+
+// --------------------------------------------------
+// Phase 7: Automation Rules
+// --------------------------------------------------
+
+/// A user-defined if/then rule that fires after AI classification
+model Rule {
+  id                String   @id @default(cuid())
+  userId            String
+  name              String   // e.g. "Archive Receipts"
+
+  // Condition
+  conditionField    String   @default("category") // extensible for future fields
+  conditionValue    String   // e.g. "receipt" | "newsletter" | "spam"
+
+  // Action
+  actionType        String   // "archive" | "markRead" | "addLabel"
+  actionValue       String?  // optional, e.g. a label name for "addLabel"
+
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("rules")
+}
+
 

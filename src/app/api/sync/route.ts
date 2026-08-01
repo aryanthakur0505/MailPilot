@@ -130,10 +130,16 @@ export async function POST() {
 
     syncedCount++;
 
-    // Enqueue AI processing job for this email
+    // Enqueue AI processing jobs for this email
     try {
       await emailQueue.add("categorize-email", {
         type: "categorize-email",
+        userId,
+        payload: { emailId: upsertedEmail.id },
+      });
+      // Phase 8: also enqueue embedding generation for semantic search
+      await emailQueue.add("generate-embedding", {
+        type: "generate-embedding",
         userId,
         payload: { emailId: upsertedEmail.id },
       });

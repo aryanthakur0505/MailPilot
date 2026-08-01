@@ -1,11 +1,11 @@
 // ==================================================
 // MailPilot — AI Client (Google Gemini)
 // ==================================================
-// Wraps the Gemini 1.5 Flash model with structured
-// prompts for email classification, draft generation,
-// and task extraction. All outputs are strict JSON.
+// Wraps the Gemini Flash model with structured prompts
+// for email classification, draft generation (with tone
+// + style control), and task extraction.
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 
 // -----------------------------------------------------------------------
 // Client singleton
@@ -14,10 +14,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
 function getModel() {
   return genAI.getGenerativeModel({
-    model: "antigravity-preview-05-2026",
+    model: "gemini-2.0-flash",
     generationConfig: {
       responseMimeType: "application/json",
-      temperature: 0.3,
+      temperature: 0.4,
     },
   });
 }
@@ -33,6 +33,8 @@ export type EmailCategory =
   | "social"
   | "spam"
   | "urgent";
+
+export type DraftTone = "professional" | "friendly" | "brief" | "detailed";
 
 export interface EmailClassification {
   category: EmailCategory;
@@ -54,10 +56,23 @@ export interface ExtractedTask {
 // Helper: safely parse JSON from LLM output
 // -----------------------------------------------------------------------
 function parseJson<T>(raw: string): T {
-  // Strip markdown code fences if present
   const cleaned = raw.replace(/^```(?:json)?\n?/m, "").replace(/\n?```$/m, "").trim();
   return JSON.parse(cleaned) as T;
 }
+
+// -----------------------------------------------------------------------
+// Tone instruction map
+// -----------------------------------------------------------------------
+const toneInstructions: Record<DraftTone, string> = {
+  professional:
+    "Write in a formal, professional tone. Use complete sentences. Be courteous and concise.",
+  friendly:
+    "Write in a warm, conversational tone. Feel free to use casual language and a friendly greeting.",
+  brief:
+    "Write an extremely short reply — 2 to 4 sentences maximum. Get straight to the point.",
+  detailed:
+    "Write a thorough, comprehensive reply. Address all points raised in the original email with detail.",
+};
 
 // -----------------------------------------------------------------------
 // 1. Classify an email
@@ -83,21 +98,30 @@ Return this exact JSON structure:
 }`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJson<EmailClassification>(text);
+  return parseJson<EmailClassification>(result.response.text());
 }
 
 // -----------------------------------------------------------------------
-// 2. Generate a draft reply
+// 2. Generate a draft reply (with tone + optional style hint)
 // -----------------------------------------------------------------------
 export async function generateDraft(
   subject: string,
   fromName: string,
-  body: string
+  body: string,
+  tone: DraftTone = "professional",
+  userStyleHint?: string
 ): Promise<DraftResult> {
   const model = getModel();
 
-  const prompt = `You are a professional email assistant. Write a concise, helpful reply to this email.
+  const styleSection = userStyleHint
+    ? `\nUser's writing style: ${userStyleHint}`
+    : "";
+
+  const toneInstruction = toneInstructions[tone];
+
+  const prompt = `You are a personal email assistant. Write a reply to the email below.
+
+Tone instruction: ${toneInstruction}${styleSection}
 
 Original Email:
 From: ${fromName}
@@ -107,12 +131,11 @@ Body: ${body?.slice(0, 2000) || ""}
 Return this exact JSON structure:
 {
   "subject": "Re: ${subject || ""}",
-  "body": "The full reply body text, plain text only, no HTML"
+  "body": "The full reply body text — plain text only, no HTML, no markdown"
 }`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJson<DraftResult>(text);
+  return parseJson<DraftResult>(result.response.text());
 }
 
 // -----------------------------------------------------------------------
@@ -130,10 +153,109 @@ Subject: ${subject || "(no subject)"}
 Body: ${body?.slice(0, 2000) || ""}
 
 Return a JSON array only. If there are no tasks, return an empty array [].
-Each task should follow this structure:
-{ "title": "Short action item description", "dueDate": "2024-01-15" or null }`;
+Each task: { "title": "Short action item description", "dueDate": "2024-01-15" or null }`;
 
   const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJson<ExtractedTask[]>(text);
+  return parseJson<ExtractedTask[]>(result.response.text());
 }
+
+// -----------------------------------------------------------------------
+// 4. Analyze writing style from sent emails (Phase 6)
+// -----------------------------------------------------------------------
+export interface WritingStyleResult {
+  styleSummary: string; // 2-4 sentence profile describing the user's style
+}
+
+export async function analyzeWritingStyle(
+  sentEmailBodies: string[]
+): Promise<WritingStyleResult> {
+  // Use a slightly higher temperature for more nuanced style analysis
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.5,
+    },
+  });
+
+  // Concatenate up to 30 emails, each capped to 500 chars to stay in token budget
+  const sample = sentEmailBodies
+    .slice(0, 30)
+    .map((body, i) => `--- Email ${i + 1} ---\n${body.slice(0, 500)}`)
+    .join("\n\n");
+
+  const prompt = `You are a writing style analyst. Based on the following emails sent by a user, write a concise 2-4 sentence description of their personal writing style.
+
+Focus on:
+- Tone (formal vs casual, warm vs neutral)
+- Sentence length and structure (short/punchy vs long/detailed)
+- Greeting and sign-off patterns
+- Use of punctuation, emoji, or informal language
+- Any distinctive phrases or patterns
+
+Sent emails sample:
+${sample}
+
+Return this exact JSON structure:
+{
+  "styleSummary": "2-4 sentence description of the user's writing style"
+}`;
+
+  const result = await model.generateContent(prompt);
+  return parseJson<WritingStyleResult>(result.response.text());
+}
+
+// -----------------------------------------------------------------------
+// 5. Generate vector embedding for semantic search (Phase 8)
+// -----------------------------------------------------------------------
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const embeddingModel = genAI.getGenerativeModel({
+    model: "text-embedding-004",
+  });
+
+  const result = await embeddingModel.embedContent({
+    content: { parts: [{ text: text.slice(0, 8000) }], role: "user" },
+    taskType: TaskType.RETRIEVAL_DOCUMENT,
+  });
+
+  return result.embedding.values;
+}
+
+// -----------------------------------------------------------------------
+// 6. Answer a question using retrieved email context (Phase 8 RAG)
+// -----------------------------------------------------------------------
+export async function answerFromContext(
+  userQuery: string,
+  emailContexts: { subject: string; from: string; body: string; date: string }[]
+): Promise<string> {
+  // Use a text model (not JSON mode) for a natural language answer
+  const chatModel = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    generationConfig: {
+      temperature: 0.3,
+    },
+  });
+
+  const contextBlock = emailContexts
+    .map(
+      (e, i) =>
+        `--- Email ${i + 1} ---\nFrom: ${e.from}\nDate: ${e.date}\nSubject: ${e.subject}\n\n${e.body.slice(0, 1000)}`
+    )
+    .join("\n\n");
+
+  const prompt = `You are MailPilot, an AI assistant with access to the user's emails.
+Answer the user's question using ONLY the emails provided below as context.
+If the answer is not in the emails, say "I couldn't find that in your emails."
+Be concise and direct. Never make up information.
+
+User Question: ${userQuery}
+
+Email Context:
+${contextBlock}
+
+Answer:`;
+
+  const result = await chatModel.generateContent(prompt);
+  return result.response.text().trim();
+}
+

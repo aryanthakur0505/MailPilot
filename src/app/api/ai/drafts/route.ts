@@ -60,10 +60,18 @@ export async function POST(req: NextRequest) {
 
   // Generate draft immediately (synchronous for the API — fast enough for UX)
   try {
+    // Phase 6: Fetch user's writing style profile if available
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { writingStyle: true },
+    });
+
     const result = await generateDraft(
       email.subject ?? "",
       email.fromName ?? "Unknown",
-      email.body ?? email.snippet ?? ""
+      email.body ?? email.snippet ?? "",
+      "professional",
+      user?.writingStyle ?? undefined
     );
 
     const draft = await prisma.aiDraft.create({

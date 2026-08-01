@@ -1,7 +1,7 @@
 // ==================================================
 // MailPilot — AI Draft by ID
 // ==================================================
-// PATCH /api/ai/drafts/[id] — update draft status
+// PATCH /api/ai/drafts/[id] — update draft body, subject, or status
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -17,26 +17,38 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { status } = await req.json();
+  const body = await req.json();
+  const { status, body: draftBody, subject } = body;
 
-  if (!["draft", "discarded"].includes(status)) {
+  // Validate status if provided
+  if (status && !["draft", "discarded"].includes(status)) {
     return NextResponse.json(
       { error: "Invalid status. Must be 'draft' or 'discarded'." },
       { status: 400 }
     );
   }
 
-  const draft = await prisma.aiDraft.findFirst({
+  const existing = await prisma.aiDraft.findFirst({
     where: { id, userId: session.user.id },
   });
 
-  if (!draft) {
+  if (!existing) {
     return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+  }
+
+  // Build update payload — only update fields that were provided
+  const updateData: Record<string, unknown> = {};
+  if (status !== undefined) updateData.status = status;
+  if (draftBody !== undefined) updateData.body = draftBody;
+  if (subject !== undefined) updateData.subject = subject;
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
   }
 
   const updated = await prisma.aiDraft.update({
     where: { id },
-    data: { status },
+    data: updateData,
   });
 
   return NextResponse.json({ draft: updated });

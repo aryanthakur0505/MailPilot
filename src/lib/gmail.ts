@@ -174,3 +174,92 @@ export async function fetchInboxEmails(
 
   return parsed;
 }
+
+// -----------------------------------------------------------------------
+// Send an email via Gmail API (user-triggered only)
+// -----------------------------------------------------------------------
+export async function sendGmailEmail(
+  accessToken: string,
+  refreshToken: string,
+  options: {
+    to: string;
+    subject: string;
+    body: string;
+    threadId?: string; // pass to keep it in the same Gmail thread
+  }
+): Promise<{ messageId: string }> {
+  const gmail = getGmailClient(accessToken, refreshToken);
+
+  // Build RFC 2822 MIME message
+  const mimeLines = [
+    `To: ${options.to}`,
+    `Subject: ${options.subject}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "MIME-Version: 1.0",
+    "",
+    options.body,
+  ];
+  const raw = Buffer.from(mimeLines.join("\r\n"))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const res = await gmail.users.messages.send({
+    userId: "me",
+    requestBody: {
+      raw,
+      threadId: options.threadId,
+    },
+  });
+
+  return { messageId: res.data.id! };
+}
+
+// -----------------------------------------------------------------------
+// Fetch sent emails for writing style analysis (Phase 6)
+// -----------------------------------------------------------------------
+export async function fetchSentEmails(
+  accessToken: string,
+  refreshToken: string,
+  maxResults = 30
+): Promise<{ subject: string; body: string }[]> {
+  const gmail = getGmailClient(accessToken, refreshToken);
+
+  const listRes = await gmail.users.messages.list({
+    userId: "me",
+    labelIds: ["SENT"],
+    maxResults,
+  });
+
+  const messages = listRes.data.messages ?? [];
+  if (messages.length === 0) return [];
+
+  const results: { subject: string; body: string }[] = [];
+  const batchSize = 10;
+
+  for (let i = 0; i < messages.length; i += batchSize) {
+    const batch = messages.slice(i, i + batchSize);
+    const fetched = await Promise.all(
+      batch.map(async (msg) => {
+        if (!msg.id) return null;
+        const detail = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id,
+          format: "full",
+        });
+        const headers = detail.data.payload?.headers ?? [];
+        const subject =
+          headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "";
+        const body = extractBody(detail.data.payload ?? {});
+        return { subject, body };
+      })
+    );
+    results.push(
+      ...fetched.filter((r): r is { subject: string; body: string } => r !== null)
+    );
+  }
+
+  return results;
+}
+

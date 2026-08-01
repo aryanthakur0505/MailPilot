@@ -47,7 +47,9 @@ export type EmailJobName =
   | "categorize-email"
   | "summarize-thread"
   | "generate-draft"
-  | "extract-tasks";
+  | "extract-tasks"
+  | "analyze-writing-style"
+  | "generate-embedding";
 
 export interface EmailJobData {
   type: EmailJobName;
