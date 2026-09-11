@@ -5,8 +5,8 @@
 // ==================================================
 
 import { useState } from "react";
-import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TaskCheckboxProps {
   taskId: string;
@@ -37,18 +37,11 @@ export function TaskCheckbox({ taskId, completed: initialCompleted }: TaskCheckb
   }
 
   return (
-    <button
-      onClick={toggle}
+    <Checkbox
+      checked={completed}
       disabled={loading}
-      className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full transition-all duration-200 mt-0.5"
-      style={{
-        backgroundColor: completed ? "rgba(52,211,153,0.15)" : "transparent",
-        border: completed
-          ? "1.5px solid #34d399"
-          : "1.5px solid var(--border-default)",
-      }}
-    >
-      {completed && <Check size={10} style={{ color: "#34d399" }} strokeWidth={3} />}
-    </button>
+      onCheckedChange={toggle}
+      className="mt-0.5 shrink-0"
+    />
   );
 }

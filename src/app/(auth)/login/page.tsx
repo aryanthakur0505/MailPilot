@@ -6,45 +6,37 @@
 
 import { signIn } from "next-auth/react";
 import { Logo } from "@/components/layout/Logo";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { Mail, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Shield } from "lucide-react";
 import Link from "next/link";
 
 export default function LoginPage() {
   return (
-    <div className="bg-mesh flex min-h-screen items-center justify-center px-6">
-      {/* Ambient glow */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="h-[400px] w-[600px] rounded-full bg-indigo-500/8 blur-[100px]" />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md">
-        {/* Logo */}
+    <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Logo size="lg" />
         </div>
 
-        {/* Login Card */}
-        <Card glow className="p-8">
+        <Card className="p-8">
           <div className="mb-8 text-center">
-            <h1 className="mb-2 text-2xl font-bold text-white">
+            <h1 className="mb-2 text-2xl font-semibold tracking-tight">
               Welcome to MailPilot
             </h1>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground">
               Sign in with your email provider to get started
             </p>
           </div>
 
-          <div className="space-y-4">
-            {/* Google Login */}
+          <div className="space-y-3">
             <Button
-              variant="secondary"
+              variant="outline"
               size="lg"
-              className="w-full"
+              className="w-full gap-2"
               onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5 mr-1">
+              <svg viewBox="0 0 24 24" className="size-5">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                   fill="#4285F4"
@@ -65,16 +57,15 @@ export default function LoginPage() {
               Continue with Google
             </Button>
 
-            {/* Microsoft Login */}
             <Button
-              variant="secondary"
+              variant="outline"
               size="lg"
-              className="w-full"
+              className="w-full gap-2"
               onClick={() =>
                 signIn("microsoft-entra-id", { callbackUrl: "/dashboard" })
               }
             >
-              <svg viewBox="0 0 23 23" className="h-5 w-5 mr-1">
+              <svg viewBox="0 0 23 23" className="size-5">
                 <rect x="1" y="1" width="10" height="10" fill="#F25022" />
                 <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
                 <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
@@ -84,31 +75,26 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          {/* Divider */}
           <div className="my-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-slate-800" />
-            <span className="text-xs text-slate-500">SECURE LOGIN</span>
-            <div className="h-px flex-1 bg-slate-800" />
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs tracking-wide text-muted-foreground">SECURE LOGIN</span>
+            <div className="h-px flex-1 bg-border" />
           </div>
 
-          {/* Trust */}
-          <div className="flex items-start gap-3 rounded-xl bg-slate-800/30 p-4">
-            <Shield size={18} className="mt-0.5 shrink-0 text-emerald-400" />
-            <div>
-              <p className="text-xs leading-relaxed text-slate-400">
-                MailPilot uses OAuth 2.0 for secure authentication. We never
-                store your email password. AI only reads emails — it never sends
-                without your explicit approval.
-              </p>
-            </div>
+          <div className="flex items-start gap-3 rounded-lg bg-muted p-4">
+            <Shield size={18} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              MailPilot uses OAuth 2.0 for secure authentication. We never
+              store your email password. AI only reads emails — it never sends
+              without your explicit approval.
+            </p>
           </div>
         </Card>
 
-        {/* Back link */}
         <div className="mt-6 text-center">
           <Link
             href="/"
-            className="text-sm text-slate-500 transition-colors hover:text-white"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             ← Back to home
           </Link>

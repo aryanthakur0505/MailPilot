@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Sparkles, Check, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function EmailRowAiButton({ emailId }: { emailId: string }) {
   const router = useRouter();
@@ -34,34 +36,34 @@ export function EmailRowAiButton({ emailId }: { emailId: string }) {
   }
 
   return (
-    <button
+    <Button
+      variant="secondary"
+      size="sm"
       onClick={generateDraft}
       disabled={status === "loading"}
-      className="hidden group-hover:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
-      style={{
-        backgroundColor: status === "done" ? "rgba(16,185,129,0.1)" : "rgba(139,92,246,0.1)",
-        color: status === "done" ? "#10b981" : "#a78bfa",
-        border: `1px solid ${status === "done" ? "rgba(16,185,129,0.2)" : "rgba(139,92,246,0.2)"}`,
-      }}
+      className={cn(
+        "hidden gap-1.5 group-hover:flex",
+        status === "done" && "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400"
+      )}
     >
       {status === "idle" && (
         <>
           <Sparkles size={12} />
-          <span>Draft Reply</span>
+          Draft Reply
         </>
       )}
       {status === "loading" && (
         <>
           <Loader2 size={12} className="animate-spin" />
-          <span>Drafting...</span>
+          Drafting...
         </>
       )}
       {status === "done" && (
         <>
           <Check size={12} />
-          <span>Drafted</span>
+          Drafted
         </>
       )}
-    </button>
+    </Button>
   );
 }

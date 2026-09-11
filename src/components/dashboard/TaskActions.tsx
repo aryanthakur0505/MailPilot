@@ -7,7 +7,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, Calendar, Loader2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface TaskActionsProps {
   taskId: string;
@@ -51,55 +53,29 @@ export function TaskActions({ taskId, dueDate: initialDueDate }: TaskActionsProp
   }
 
   return (
-    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-      {/* Due date picker */}
+    <div className="flex items-center gap-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
       <div className="relative flex items-center">
-        <Calendar
-          size={11}
-          className="absolute left-2 pointer-events-none"
-          style={{ color: "var(--text-faint)" }}
-        />
-        <input
+        <Input
           type="date"
           value={dueDate}
           onChange={handleDateChange}
           disabled={savingDate}
-          className="pl-6 pr-2 py-1 rounded-lg text-xs outline-none transition-all"
-          style={{
-            backgroundColor: "var(--bg-elevated)",
-            color: "var(--text-muted)",
-            border: "1px solid var(--border-subtle)",
-            width: "130px",
-            colorScheme: "dark",
-          }}
+          className="h-7 w-[132px] pr-6 text-xs"
         />
         {savingDate && (
-          <Loader2
-            size={10}
-            className="absolute right-2 animate-spin"
-            style={{ color: "var(--text-faint)" }}
-          />
+          <Loader2 size={10} className="absolute right-2 animate-spin text-muted-foreground" />
         )}
       </div>
 
-      {/* Delete */}
-      <button
+      <Button
+        variant="destructive"
+        size="icon-xs"
         onClick={handleDelete}
         disabled={deleting}
-        className="flex h-6 w-6 items-center justify-center rounded-lg transition-all duration-150 disabled:opacity-40"
-        style={{
-          backgroundColor: "rgba(239,68,68,0.06)",
-          color: "#f87171",
-          border: "1px solid rgba(239,68,68,0.12)",
-        }}
         title="Delete task"
       >
-        {deleting ? (
-          <Loader2 size={10} className="animate-spin" />
-        ) : (
-          <Trash2 size={10} />
-        )}
-      </button>
+        {deleting ? <Loader2 size={10} className="animate-spin" /> : <Trash2 size={10} />}
+      </Button>
     </div>
   );
 }

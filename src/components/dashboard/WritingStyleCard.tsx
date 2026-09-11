@@ -9,6 +9,9 @@
 import { useState, useEffect } from "react";
 import { Sparkles, RefreshCw, Loader2, User, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StyleData {
   writingStyle: string | null;
@@ -50,21 +53,19 @@ export function WritingStyleCard() {
         const pollRes = await fetch("/api/ai/style/analyze");
         if (pollRes.ok) {
           const fresh: StyleData = await pollRes.json();
-          // If styleAnalyzedAt changed we have a fresh result
           if (fresh.styleAnalyzedAt !== data?.styleAnalyzedAt) {
             setData(fresh);
             setAnalyzing(false);
             clearInterval(pollInterval);
           }
         }
-      }, 5000); // poll every 5 seconds
+      }, 5000);
 
-      // Safety timeout after 3 minutes
       setTimeout(() => {
         clearInterval(pollInterval);
         if (analyzing) {
           setAnalyzing(false);
-          fetchStyle(); // fetch whatever we have
+          fetchStyle();
         }
       }, 180_000);
     } catch (err: unknown) {
@@ -74,157 +75,81 @@ export function WritingStyleCard() {
   }
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
-      {/* Gradient top bar */}
-      <div
-        className="h-0.5 w-full"
-        style={{ background: "linear-gradient(90deg, #8b5cf6, #6366f1)" }}
-      />
-
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl"
-              style={{
-                background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(99,102,241,0.1))",
-                border: "1px solid rgba(139,92,246,0.2)",
-              }}
-            >
-              <User size={18} style={{ color: "#a78bfa" }} strokeWidth={1.8} />
-            </div>
-            <div>
-              <h2
-                className="text-sm font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                My Writing Style
-              </h2>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Used to personalize AI-generated drafts
-              </p>
-            </div>
+    <Card className="p-6">
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-violet-500/10">
+            <User size={18} className="text-violet-600 dark:text-violet-400" strokeWidth={1.8} />
           </div>
-
-          <button
-            onClick={handleAnalyze}
-            disabled={analyzing || loading}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-150 active:scale-[0.97] disabled:opacity-40"
-            style={{
-              backgroundColor: "rgba(99,102,241,0.08)",
-              color: "#818cf8",
-              border: "1px solid rgba(99,102,241,0.15)",
-            }}
-          >
-            {analyzing ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <RefreshCw size={12} />
-            )}
-            {analyzing ? "Analyzing..." : "Analyze Style"}
-          </button>
+          <div>
+            <h2 className="text-sm font-semibold">My Writing Style</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Used to personalize AI-generated drafts
+            </p>
+          </div>
         </div>
 
-        {/* Loading skeleton */}
-        {loading && (
-          <div className="space-y-2">
-            {[70, 90, 55].map((w) => (
-              <div
-                key={w}
-                className="h-3 rounded animate-pulse"
-                style={{
-                  width: `${w}%`,
-                  backgroundColor: "var(--bg-elevated)",
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Analyzing in-progress banner */}
-        {!loading && analyzing && (
-          <div
-            className="rounded-xl px-4 py-3 flex items-center gap-3 text-sm"
-            style={{
-              backgroundColor: "rgba(99,102,241,0.06)",
-              border: "1px solid rgba(99,102,241,0.12)",
-              color: "#818cf8",
-            }}
-          >
-            <Loader2 size={14} className="animate-spin shrink-0" />
-            <span>
-              Fetching your sent emails and analyzing your style...
-              <br />
-              <span className="text-xs" style={{ color: "var(--text-faint)" }}>
-                This takes about 30–60 seconds
-              </span>
-            </span>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div
-            className="rounded-xl px-4 py-3 flex items-center gap-2 text-sm"
-            style={{
-              backgroundColor: "rgba(239,68,68,0.06)",
-              border: "1px solid rgba(239,68,68,0.12)",
-              color: "#f87171",
-            }}
-          >
-            <AlertTriangle size={14} />
-            {error}
-          </div>
-        )}
-
-        {/* Style profile */}
-        {!loading && !analyzing && data?.writingStyle && (
-          <div className="space-y-3">
-            <div
-              className="rounded-xl p-4 text-sm leading-relaxed"
-              style={{
-                backgroundColor: "var(--bg-elevated)",
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
-              <Sparkles
-                size={13}
-                className="inline mr-1.5 -mt-0.5"
-                style={{ color: "#a78bfa" }}
-              />
-              {data.writingStyle}
-            </div>
-            {data.styleAnalyzedAt && (
-              <p className="text-xs" style={{ color: "var(--text-faint)" }}>
-                Last analyzed{" "}
-                {formatDistanceToNow(new Date(data.styleAnalyzedAt), { addSuffix: true })}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !analyzing && !data?.writingStyle && (
-          <div className="text-center py-4">
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              No style profile yet.
-            </p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-faint)" }}>
-              Click{" "}
-              <span style={{ color: "#818cf8" }}>Analyze Style</span> to let the AI
-              study your writing from your sent emails.
-            </p>
-          </div>
-        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleAnalyze}
+          disabled={analyzing || loading}
+          className="gap-1.5"
+        >
+          {analyzing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+          {analyzing ? "Analyzing..." : "Analyze Style"}
+        </Button>
       </div>
-    </div>
+
+      {loading && (
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-[70%]" />
+          <Skeleton className="h-3 w-[90%]" />
+          <Skeleton className="h-3 w-[55%]" />
+        </div>
+      )}
+
+      {!loading && analyzing && (
+        <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+          <Loader2 size={14} className="shrink-0 animate-spin" />
+          <span>
+            Fetching your sent emails and analyzing your style...
+            <br />
+            <span className="text-xs text-muted-foreground">This takes about 30–60 seconds</span>
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle size={14} />
+          {error}
+        </div>
+      )}
+
+      {!loading && !analyzing && data?.writingStyle && (
+        <div className="space-y-3">
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm leading-relaxed text-foreground/90">
+            <Sparkles size={13} className="-mt-0.5 mr-1.5 inline text-violet-500" />
+            {data.writingStyle}
+          </div>
+          {data.styleAnalyzedAt && (
+            <p className="text-xs text-muted-foreground">
+              Last analyzed {formatDistanceToNow(new Date(data.styleAnalyzedAt), { addSuffix: true })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!loading && !analyzing && !data?.writingStyle && (
+        <div className="py-4 text-center">
+          <p className="text-sm text-muted-foreground">No style profile yet.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Click <span className="text-primary">Analyze Style</span> to let the AI study your
+            writing from your sent emails.
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }

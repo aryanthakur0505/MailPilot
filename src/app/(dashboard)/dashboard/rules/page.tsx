@@ -4,19 +4,31 @@
 // MailPilot — Rules Page (Phase 7)
 // ==================================================
 // Displays user's automation rules with a toggle switch
-// and a modal to create new IF/THEN rules.
+// and a dialog to create new IF/THEN rules.
 
 import { useState, useEffect, useCallback } from "react";
+import { Zap, Plus, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
-  Zap,
-  Plus,
-  Trash2,
-  Loader2,
-  X,
-  ChevronDown,
-  CheckCircle2,
-  Circle,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface Rule {
   id: string;
@@ -45,14 +57,14 @@ const ACTION_LABELS: Record<string, string> = {
   addLabel: "Add Label…",
 };
 
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  work:       { bg: "rgba(99,102,241,0.1)",  text: "#818cf8", border: "rgba(99,102,241,0.2)" },
-  personal:   { bg: "rgba(52,211,153,0.1)",  text: "#34d399", border: "rgba(52,211,153,0.2)" },
-  newsletter: { bg: "rgba(251,191,36,0.1)",  text: "#fbbf24", border: "rgba(251,191,36,0.2)" },
-  receipt:    { bg: "rgba(167,139,250,0.1)", text: "#a78bfa", border: "rgba(167,139,250,0.2)" },
-  social:     { bg: "rgba(96,165,250,0.1)",  text: "#60a5fa", border: "rgba(96,165,250,0.2)" },
-  spam:       { bg: "rgba(239,68,68,0.1)",   text: "#f87171", border: "rgba(239,68,68,0.2)"  },
-  urgent:     { bg: "rgba(251,146,60,0.1)",  text: "#fb923c", border: "rgba(251,146,60,0.2)" },
+const CATEGORY_BADGE_CLASS: Record<string, string> = {
+  work: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  personal: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  newsletter: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  receipt: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  social: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  spam: "bg-red-500/10 text-red-600 dark:text-red-400",
+  urgent: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
 };
 
 export default function RulesPage() {
@@ -62,7 +74,6 @@ export default function RulesPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
 
-  // Form state
   const [form, setForm] = useState({
     name: "",
     conditionValue: "newsletter",
@@ -144,53 +155,30 @@ export default function RulesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{
-              background: "linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,146,60,0.1))",
-              border: "1px solid rgba(251,191,36,0.2)",
-            }}
-          >
-            <Zap size={18} style={{ color: "#fbbf24" }} strokeWidth={1.8} />
+          <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10">
+            <Zap size={18} className="text-amber-600 dark:text-amber-400" strokeWidth={1.8} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
-              Automation Rules
-            </h1>
-            <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
+            <h1 className="text-2xl font-semibold tracking-tight">Automation Rules</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
               {activeCount} active rule{activeCount !== 1 ? "s" : ""} · runs automatically after AI classification
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.97]"
-          style={{
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-            color: "white",
-            boxShadow: "0 4px 12px rgba(99,102,241,0.3)",
-          }}
-        >
+        <Button onClick={() => setShowModal(true)} className="gap-2">
           <Plus size={15} />
           New Rule
-        </button>
+        </Button>
       </div>
 
       {/* How it works banner */}
-      <div
-        className="rounded-xl px-4 py-3 flex items-start gap-3 text-sm"
-        style={{
-          backgroundColor: "rgba(251,191,36,0.04)",
-          border: "1px solid rgba(251,191,36,0.1)",
-          color: "var(--text-muted)",
-        }}
-      >
-        <Zap size={14} className="mt-0.5 shrink-0" style={{ color: "#fbbf24" }} />
+      <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+        <Zap size={14} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <span>
           Rules fire automatically when the AI classifies an incoming email.{" "}
-          <strong style={{ color: "var(--text-secondary)" }}>Only safe actions</strong>{" "}
+          <strong className="text-foreground">Only safe actions</strong>{" "}
           (archive, mark read, add label) are supported — no auto-delete or auto-reply.
         </span>
       </div>
@@ -198,249 +186,155 @@ export default function RulesPage() {
       {/* Rules list */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 size={20} className="animate-spin" style={{ color: "var(--text-muted)" }} />
+          <Loader2 size={20} className="animate-spin text-muted-foreground" />
         </div>
       ) : rules.length === 0 ? (
-        <div
-          className="rounded-2xl p-12 text-center"
-          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
-        >
-          <Zap size={32} className="mx-auto mb-3" style={{ color: "var(--text-faint)" }} />
-          <p className="text-sm font-medium" style={{ color: "var(--text-muted)" }}>No rules yet</p>
-          <p className="text-xs mt-1" style={{ color: "var(--text-faint)" }}>
+        <Card className="p-12 text-center">
+          <Zap size={32} className="mx-auto mb-3 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-muted-foreground">No rules yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">
             Create your first automation to take the admin work out of your inbox.
           </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all"
-            style={{ backgroundColor: "rgba(99,102,241,0.1)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.15)" }}
-          >
+          <Button variant="secondary" size="sm" onClick={() => setShowModal(true)} className="mt-4 gap-1.5">
             <Plus size={13} /> Create first rule
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : (
         <div className="space-y-2.5">
           {rules.map((rule) => {
-            const catColor = CATEGORY_COLORS[rule.conditionValue] ?? CATEGORY_COLORS.work;
+            const badgeClass = CATEGORY_BADGE_CLASS[rule.conditionValue] ?? CATEGORY_BADGE_CLASS.work;
             return (
-              <div
+              <Card
                 key={rule.id}
-                className="flex items-center gap-4 rounded-2xl px-5 py-4 transition-all duration-150"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  border: `1px solid ${rule.isActive ? "var(--border-subtle)" : "var(--border-subtle)"}`,
-                  opacity: rule.isActive ? 1 : 0.55,
-                }}
+                className={`flex flex-row flex-wrap items-center gap-4 p-4 ${rule.isActive ? "" : "opacity-55"}`}
               >
-                {/* IF badge */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>IF</span>
-                  <span
-                    className="rounded-lg px-2.5 py-1 text-xs font-semibold"
-                    style={{ backgroundColor: catColor.bg, color: catColor.text, border: `1px solid ${catColor.border}` }}
-                  >
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">IF</span>
+                  <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>
                     {CATEGORY_LABELS[rule.conditionValue] ?? rule.conditionValue}
                   </span>
                 </div>
 
-                <span className="text-xs" style={{ color: "var(--text-faint)" }}>→</span>
+                <span className="text-xs text-muted-foreground">→</span>
 
-                {/* THEN badge */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>THEN</span>
-                  <span
-                    className="rounded-lg px-2.5 py-1 text-xs font-semibold"
-                    style={{ backgroundColor: "rgba(99,102,241,0.08)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.15)" }}
-                  >
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">THEN</span>
+                  <Badge variant="secondary">
                     {ACTION_LABELS[rule.actionType] ?? rule.actionType}
                     {rule.actionValue ? ` "${rule.actionValue}"` : ""}
-                  </span>
+                  </Badge>
                 </div>
 
-                {/* Name */}
-                <span className="flex-1 text-sm truncate" style={{ color: "var(--text-secondary)" }}>
-                  {rule.name}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{rule.name}</span>
 
-                {/* Toggle */}
-                <button
-                  onClick={() => handleToggle(rule)}
+                <Switch
+                  checked={rule.isActive}
                   disabled={toggling === rule.id}
-                  className="shrink-0 transition-all"
-                  title={rule.isActive ? "Pause rule" : "Activate rule"}
-                >
-                  {toggling === rule.id ? (
-                    <Loader2 size={16} className="animate-spin" style={{ color: "var(--text-faint)" }} />
-                  ) : rule.isActive ? (
-                    <CheckCircle2 size={18} style={{ color: "#34d399" }} />
-                  ) : (
-                    <Circle size={18} style={{ color: "var(--text-faint)" }} />
-                  )}
-                </button>
+                  onCheckedChange={() => handleToggle(rule)}
+                  aria-label={rule.isActive ? "Pause rule" : "Activate rule"}
+                />
 
-                {/* Delete */}
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => handleDelete(rule.id)}
                   disabled={deleting === rule.id}
-                  className="shrink-0 rounded-lg p-1.5 transition-all hover:bg-[rgba(239,68,68,0.08)]"
-                  style={{ color: "var(--text-faint)" }}
+                  className="text-muted-foreground hover:text-destructive"
                 >
-                  {deleting === rule.id ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
-              </div>
+                  {deleting === rule.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                </Button>
+              </Card>
             );
           })}
         </div>
       )}
 
-      {/* Create Rule Modal */}
-      {showModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl p-6 shadow-2xl"
-            style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-                Create Automation Rule
-              </h2>
-              <button onClick={() => setShowModal(false)} style={{ color: "var(--text-muted)" }}>
-                <X size={18} />
-              </button>
+      {/* Create Rule Dialog */}
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Automation Rule</DialogTitle>
+            <DialogDescription>
+              Define a condition and an action to run automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-name">Rule Name (optional)</Label>
+              <Input
+                id="rule-name"
+                placeholder="e.g. Archive all newsletters"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-4">
-              {/* Rule Name */}
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-muted)" }}>
-                  Rule Name (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Archive all newsletters"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all"
-                  style={{
-                    backgroundColor: "var(--bg-elevated)",
-                    border: "1px solid var(--border-subtle)",
-                    color: "var(--text-primary)",
-                  }}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold tracking-widest uppercase">IF Category is…</Label>
+              <Select
+                value={form.conditionValue}
+                onValueChange={(value) => setForm({ ...form, conditionValue: value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold tracking-widest uppercase">THEN…</Label>
+              <Select
+                value={form.actionType}
+                onValueChange={(value) => setForm({ ...form, actionType: value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ACTION_LABELS).map(([val, label]) => (
+                    <SelectItem key={val} value={val}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {form.actionType === "addLabel" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="rule-label">Label Name</Label>
+                <Input
+                  id="rule-label"
+                  placeholder="e.g. Finance"
+                  value={form.actionValue}
+                  onChange={(e) => setForm({ ...form, actionValue: e.target.value })}
+                  required
                 />
               </div>
+            )}
 
-              {/* IF condition */}
-              <div>
-                <label className="block text-xs font-bold mb-1.5 uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>
-                  IF Category is…
-                </label>
-                <div className="relative">
-                  <select
-                    value={form.conditionValue}
-                    onChange={(e) => setForm({ ...form, conditionValue: e.target.value })}
-                    className="w-full appearance-none rounded-xl px-3.5 py-2.5 text-sm outline-none pr-8"
-                    style={{
-                      backgroundColor: "var(--bg-elevated)",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-3 pointer-events-none" style={{ color: "var(--text-faint)" }} />
-                </div>
-              </div>
+            {formError && <p className="text-xs text-destructive">{formError}</p>}
 
-              {/* THEN action */}
-              <div>
-                <label className="block text-xs font-bold mb-1.5 uppercase tracking-widest" style={{ color: "var(--text-faint)" }}>
-                  THEN…
-                </label>
-                <div className="relative">
-                  <select
-                    value={form.actionType}
-                    onChange={(e) => setForm({ ...form, actionType: e.target.value })}
-                    className="w-full appearance-none rounded-xl px-3.5 py-2.5 text-sm outline-none pr-8"
-                    style={{
-                      backgroundColor: "var(--bg-elevated)",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {Object.entries(ACTION_LABELS).map(([val, label]) => (
-                      <option key={val} value={val}>{label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-3 pointer-events-none" style={{ color: "var(--text-faint)" }} />
-                </div>
-              </div>
-
-              {/* Label name (only for addLabel) */}
-              {form.actionType === "addLabel" && (
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    Label Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Finance"
-                    value={form.actionValue}
-                    onChange={(e) => setForm({ ...form, actionValue: e.target.value })}
-                    required
-                    className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none"
-                    style={{
-                      backgroundColor: "var(--bg-elevated)",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-primary)",
-                    }}
-                  />
-                </div>
-              )}
-
-              {formError && (
-                <p className="text-xs" style={{ color: "#f87171" }}>{formError}</p>
-              )}
-
-              <div className="flex gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 rounded-xl py-2.5 text-sm font-medium transition-all"
-                  style={{
-                    backgroundColor: "var(--bg-elevated)",
-                    color: "var(--text-secondary)",
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all active:scale-[0.97]"
-                  style={{
-                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                    color: "white",
-                  }}
-                >
-                  {creating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                  {creating ? "Creating…" : "Create Rule"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <DialogFooter className="-mx-0 -mb-0 border-0 bg-transparent p-0">
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating} className="gap-2">
+                {creating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                {creating ? "Creating…" : "Create Rule"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

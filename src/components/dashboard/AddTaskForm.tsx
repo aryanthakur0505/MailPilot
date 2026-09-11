@@ -8,7 +8,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Calendar } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 
 export function AddTaskForm() {
   const router = useRouter();
@@ -50,105 +53,55 @@ export function AddTaskForm() {
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.97]"
-        style={{
-          backgroundColor: "rgba(99,102,241,0.08)",
-          color: "#818cf8",
-          border: "1px solid rgba(99,102,241,0.15)",
-        }}
-      >
+      <Button variant="secondary" className="gap-2" onClick={() => setOpen(true)}>
         <Plus size={14} />
         Add Task
-      </button>
+      </Button>
     );
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-2xl p-4 space-y-3"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid rgba(99,102,241,0.2)",
-      }}
-    >
-      {/* Title input */}
-      <input
-        autoFocus
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Task title..."
-        className="w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all"
-        style={{
-          backgroundColor: "var(--bg-elevated)",
-          color: "var(--text-primary)",
-          border: "1px solid var(--border-subtle)",
-        }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(99,102,241,0.5)")}
-        onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-subtle)")}
-      />
+    <Card className="p-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Task title..."
+        />
 
-      {/* Due date + actions row */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex items-center">
-          <Calendar
-            size={12}
-            className="absolute left-2.5 pointer-events-none"
-            style={{ color: "var(--text-faint)" }}
-          />
-          <input
+        <div className="flex items-center gap-2">
+          <Input
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="pl-7 pr-3 py-2 rounded-xl text-xs outline-none transition-all"
-            style={{
-              backgroundColor: "var(--bg-elevated)",
-              color: "var(--text-muted)",
-              border: "1px solid var(--border-subtle)",
-              colorScheme: "dark",
-            }}
+            className="w-auto"
           />
+
+          <div className="flex-1" />
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              setTitle("");
+              setDueDate("");
+              setError("");
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button type="submit" size="sm" disabled={loading || !title.trim()} className="gap-1.5">
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+            {loading ? "Adding..." : "Add Task"}
+          </Button>
         </div>
 
-        <div className="flex-1" />
-
-        {/* Cancel */}
-        <button
-          type="button"
-          onClick={() => { setOpen(false); setTitle(""); setDueDate(""); setError(""); }}
-          className="rounded-xl px-3 py-2 text-xs font-medium transition-all"
-          style={{
-            backgroundColor: "var(--bg-elevated)",
-            color: "var(--text-muted)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
-          Cancel
-        </button>
-
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading || !title.trim()}
-          className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold transition-all disabled:opacity-40"
-          style={{
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            color: "white",
-            boxShadow: "0 2px 8px rgba(99,102,241,0.3)",
-          }}
-        >
-          {loading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-          {loading ? "Adding..." : "Add Task"}
-        </button>
-      </div>
-
-      {error && (
-        <p className="text-xs" style={{ color: "#f87171" }}>
-          {error}
-        </p>
-      )}
-    </form>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </form>
+    </Card>
   );
 }

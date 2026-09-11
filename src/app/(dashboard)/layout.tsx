@@ -13,26 +13,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="min-h-screen bg-mesh"
-      style={{ backgroundColor: "var(--bg-base)" }}
-    >
-      {/* Fixed sidebar */}
+    <div className="flex min-h-screen w-full bg-background">
       <Sidebar />
-
-      {/* Fixed topbar — offset by sidebar width */}
-      <Topbar />
-
-      {/* Main content area */}
-      <main
-        className="min-h-screen"
-        style={{
-          marginLeft: "256px",
-          paddingTop: "64px",
-        }}
-      >
-        <div className="p-8 animate-fade-up">{children}</div>
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar />
+        <main className="flex-1">
+          <div className="animate-fade-up mx-auto max-w-7xl p-6 sm:p-8">{children}</div>
+        </main>
+      </div>
 
       {/* Phase 8: Floating chat widget */}
       <ChatWidget />

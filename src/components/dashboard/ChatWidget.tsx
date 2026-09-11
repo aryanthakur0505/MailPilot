@@ -18,6 +18,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface Source {
   id: string;
@@ -40,7 +44,7 @@ export function ChatWidget() {
     {
       role: "assistant",
       content:
-        "Hi! I can answer questions about your emails. Try asking something like: *\"What's my flight number?\"* or *\"Did anyone send me a receipt from Amazon?\"*",
+        "Hi! I can answer questions about your emails. Try asking something like: \"What's my flight number?\" or \"Did anyone send me a receipt from Amazon?\"",
     },
   ]);
   const [input, setInput] = useState("");
@@ -87,8 +91,7 @@ export function ChatWidget() {
         ...prev,
         {
           role: "assistant",
-          content:
-            err instanceof Error ? err.message : "Something went wrong. Try again.",
+          content: err instanceof Error ? err.message : "Something went wrong. Try again.",
           error: true,
         },
       ]);
@@ -107,197 +110,118 @@ export function ChatWidget() {
   return (
     <>
       {/* Floating action button */}
-      <button
+      <Button
         onClick={() => setIsOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-2xl transition-all duration-200 active:scale-95"
-        style={{
-          background: isOpen
-            ? "rgba(30,27,42,0.95)"
-            : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-          boxShadow: isOpen
-            ? "0 8px 32px rgba(0,0,0,0.4)"
-            : "0 8px 32px rgba(99,102,241,0.5)",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}
+        size="icon"
+        className="fixed right-6 bottom-6 z-50 size-14 rounded-full shadow-lg"
+        variant={isOpen ? "secondary" : "default"}
         aria-label="Open chat"
       >
-        {isOpen ? (
-          <X size={22} style={{ color: "var(--text-muted)" }} />
-        ) : (
-          <MessageCircle size={22} color="white" />
-        )}
-      </button>
+        {isOpen ? <X className="size-5!" /> : <MessageCircle className="size-5!" />}
+      </Button>
 
-      {/* Chat panel */}
       {isOpen && (
-        <div
-          className="fixed bottom-24 right-6 z-50 flex flex-col rounded-2xl shadow-2xl overflow-hidden"
-          style={{
-            width: "380px",
-            height: "520px",
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
+        <div className="fixed right-6 bottom-24 z-50 flex h-[520px] w-[380px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl border bg-popover shadow-2xl">
           {/* Header */}
-          <div
-            className="flex items-center gap-3 px-4 py-3 shrink-0"
-            style={{
-              background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))",
-              borderBottom: "1px solid var(--border-subtle)",
-            }}
-          >
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg"
-              style={{
-                background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              }}
-            >
-              <Sparkles size={15} color="white" />
+          <div className="flex shrink-0 items-center gap-3 border-b bg-primary/5 px-4 py-3">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Sparkles size={15} />
             </div>
             <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                Ask your inbox
-              </p>
-              <p className="text-[10px]" style={{ color: "var(--text-faint)" }}>
-                Powered by semantic search
-              </p>
+              <p className="text-sm font-semibold">Ask your inbox</p>
+              <p className="text-[10px] text-muted-foreground">Powered by semantic search</p>
             </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
-              >
-                {/* Avatar */}
-                <div
-                  className="h-7 w-7 shrink-0 rounded-full flex items-center justify-center mt-0.5"
-                  style={{
-                    backgroundColor:
-                      msg.role === "user"
-                        ? "rgba(99,102,241,0.15)"
-                        : "rgba(139,92,246,0.12)",
-                  }}
-                >
-                  {msg.role === "user" ? (
-                    <User size={13} style={{ color: "#818cf8" }} />
-                  ) : (
-                    <Bot size={13} style={{ color: "#a78bfa" }} />
-                  )}
-                </div>
-
-                <div className={`flex flex-col gap-1.5 ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  {/* Bubble */}
+          <ScrollArea className="flex-1 px-4 py-3">
+            <div className="space-y-4">
+              {messages.map((msg, i) => (
+                <div key={i} className={cn("flex gap-2.5", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
                   <div
-                    className="rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed max-w-[280px]"
-                    style={
-                      msg.role === "user"
-                        ? {
-                            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                            color: "white",
-                          }
-                        : {
-                            backgroundColor: msg.error
-                              ? "rgba(239,68,68,0.06)"
-                              : "var(--bg-card)",
-                            color: msg.error ? "#f87171" : "var(--text-secondary)",
-                            border: `1px solid ${msg.error ? "rgba(239,68,68,0.12)" : "var(--border-subtle)"}`,
-                          }
-                    }
+                    className={cn(
+                      "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+                      msg.role === "user" ? "bg-primary/15" : "bg-violet-500/15"
+                    )}
                   >
-                    {msg.content}
+                    {msg.role === "user" ? (
+                      <User size={13} className="text-primary" />
+                    ) : (
+                      <Bot size={13} className="text-violet-600 dark:text-violet-400" />
+                    )}
                   </div>
 
-                  {/* Sources */}
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="space-y-1 w-full max-w-[280px]">
-                      <p className="text-[10px] font-medium px-1" style={{ color: "var(--text-faint)" }}>
-                        Based on {msg.sources.length} email{msg.sources.length > 1 ? "s" : ""}:
-                      </p>
-                      {msg.sources.map((src) => (
-                        <div
-                          key={src.id}
-                          className="rounded-xl px-3 py-2 flex items-center gap-2 text-[11px]"
-                          style={{
-                            backgroundColor: "var(--bg-elevated)",
-                            border: "1px solid var(--border-subtle)",
-                          }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate font-medium" style={{ color: "var(--text-secondary)" }}>
-                              {src.subject || "(no subject)"}
-                            </p>
-                            <p className="truncate" style={{ color: "var(--text-faint)" }}>
-                              {src.from} · {format(new Date(src.receivedAt), "MMM d")}
-                            </p>
-                          </div>
-                          <ExternalLink size={11} style={{ color: "var(--text-faint)", flexShrink: 0 }} />
-                        </div>
-                      ))}
+                  <div className={cn("flex max-w-[280px] flex-col gap-1.5", msg.role === "user" ? "items-end" : "items-start")}>
+                    <div
+                      className={cn(
+                        "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : msg.error
+                            ? "border border-destructive/20 bg-destructive/5 text-destructive"
+                            : "border bg-muted/40"
+                      )}
+                    >
+                      {msg.content}
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
 
-            {/* Loading indicator */}
-            {loading && (
-              <div className="flex gap-2.5">
-                <div
-                  className="h-7 w-7 shrink-0 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: "rgba(139,92,246,0.12)" }}
-                >
-                  <Bot size={13} style={{ color: "#a78bfa" }} />
+                    {msg.sources && msg.sources.length > 0 && (
+                      <div className="w-full space-y-1">
+                        <p className="px-1 text-[10px] font-medium text-muted-foreground">
+                          Based on {msg.sources.length} email{msg.sources.length > 1 ? "s" : ""}:
+                        </p>
+                        {msg.sources.map((src) => (
+                          <div key={src.id} className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-[11px]">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{src.subject || "(no subject)"}</p>
+                              <p className="truncate text-muted-foreground">
+                                {src.from} · {format(new Date(src.receivedAt), "MMM d")}
+                              </p>
+                            </div>
+                            <ExternalLink size={11} className="shrink-0 text-muted-foreground" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div
-                  className="rounded-2xl px-3.5 py-2.5"
-                  style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}
-                >
-                  <Loader2 size={15} className="animate-spin" style={{ color: "var(--text-faint)" }} />
-                </div>
-              </div>
-            )}
+              ))}
 
-            <div ref={bottomRef} />
-          </div>
+              {loading && (
+                <div className="flex gap-2.5">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-500/15">
+                    <Bot size={13} className="text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div className="rounded-xl border bg-muted/40 px-3.5 py-2.5">
+                    <Loader2 size={15} className="animate-spin text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </div>
+          </ScrollArea>
 
           {/* Input */}
-          <div
-            className="shrink-0 px-3 py-3"
-            style={{ borderTop: "1px solid var(--border-subtle)" }}
-          >
-            <div
-              className="flex items-center gap-2 rounded-xl px-3.5 py-2.5"
-              style={{
-                backgroundColor: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-              }}
+          <div className="flex shrink-0 items-center gap-2 border-t p-3">
+            <Input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask anything about your emails…"
+              disabled={loading}
+              className="flex-1"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || loading}
+              size="icon"
+              className="shrink-0"
             >
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask anything about your emails…"
-                disabled={loading}
-                className="flex-1 bg-transparent text-sm outline-none"
-                style={{ color: "var(--text-primary)" }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || loading}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 disabled:opacity-30"
-                style={{
-                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                }}
-              >
-                <Send size={13} color="white" />
-              </button>
-            </div>
+              <Send size={14} />
+            </Button>
           </div>
         </div>
       )}
