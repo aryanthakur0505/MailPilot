@@ -18,7 +18,6 @@ import {
   Sparkles,
   FolderOpen,
   Star,
-  PenSquare,
   Zap,
   ChevronsLeft,
   ChevronsRight,
@@ -27,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/layout/Logo";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ComposeButton } from "@/components/dashboard/ComposeButton";
 
 const mailLinks = [
   { label: "Inbox", href: "/dashboard", icon: Inbox },
@@ -164,21 +164,7 @@ export function Sidebar() {
       </div>
 
       <div className={cn("px-3 pt-3 pb-1", collapsed && "px-2")}>
-        {collapsed ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" className="w-full">
-                <PenSquare />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Compose</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Button className="w-full gap-2">
-            <PenSquare className="size-4" />
-            Compose
-          </Button>
-        )}
+        <ComposeButton collapsed={collapsed} />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
