@@ -137,6 +137,13 @@ export async function POST() {
         userId,
         payload: { emailId: upsertedEmail.id },
       });
+      // Phase 4: extract action items — the worker has always handled this job type,
+      // but nothing ever enqueued one, so task extraction was silently dead.
+      await emailQueue.add("extract-tasks", {
+        type: "extract-tasks",
+        userId,
+        payload: { emailId: upsertedEmail.id },
+      });
       // Phase 8: also enqueue embedding generation for semantic search
       await emailQueue.add("generate-embedding", {
         type: "generate-embedding",

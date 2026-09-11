@@ -12,9 +12,20 @@ import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 // -----------------------------------------------------------------------
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
+// gemini-2.0-flash and text-embedding-004 were retired by Google. gemini-3.1-flash-lite
+// replaces the chat model — deliberately the non-"thinking" lite variant, since this runs
+// on every synced email (classify + extract-tasks) and the reasoning-heavy "-latest" alias
+// (currently gemini-3.8-flash) burns ~10x the tokens per call on internal thinking tokens
+// for no quality benefit on these structured-output tasks. gemini-embedding-001 (truncated
+// to 768 dims via outputDimensionality, matching the existing pgvector column) replaces
+// text-embedding-004.
+const CHAT_MODEL = "gemini-3.1-flash-lite";
+const EMBEDDING_MODEL = "gemini-embedding-001";
+const EMBEDDING_DIMENSIONS = 768;
+
 function getModel() {
   return genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: CHAT_MODEL,
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.4,
@@ -171,7 +182,7 @@ export async function analyzeWritingStyle(
 ): Promise<WritingStyleResult> {
   // Use a slightly higher temperature for more nuanced style analysis
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: CHAT_MODEL,
     generationConfig: {
       responseMimeType: "application/json",
       temperature: 0.5,
@@ -210,13 +221,18 @@ Return this exact JSON structure:
 // -----------------------------------------------------------------------
 export async function generateEmbedding(text: string): Promise<number[]> {
   const embeddingModel = genAI.getGenerativeModel({
-    model: "text-embedding-004",
+    model: EMBEDDING_MODEL,
   });
 
+  // outputDimensionality isn't in this SDK version's TypeScript types yet, but the
+  // REST API honors it — verified directly against the live endpoint. Truncating to
+  // 768 dims here keeps compatibility with the existing `vector(768)` column instead
+  // of requiring a schema migration to this model's native (larger) output size.
   const result = await embeddingModel.embedContent({
     content: { parts: [{ text: text.slice(0, 8000) }], role: "user" },
     taskType: TaskType.RETRIEVAL_DOCUMENT,
-  });
+    outputDimensionality: EMBEDDING_DIMENSIONS,
+  } as Parameters<typeof embeddingModel.embedContent>[0] & { outputDimensionality: number });
 
   return result.embedding.values;
 }
@@ -230,7 +246,7 @@ export async function answerFromContext(
 ): Promise<string> {
   // Use a text model (not JSON mode) for a natural language answer
   const chatModel = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: CHAT_MODEL,
     generationConfig: {
       temperature: 0.3,
     },

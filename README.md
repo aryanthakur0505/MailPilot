@@ -37,7 +37,7 @@ When you sync your inbox, MailPilot fetches the raw emails from the **Gmail API*
 Instead of making the user wait for AI processing, MailPilot enqueues a job in **Redis (via BullMQ)**. A separate Node.js worker process picks up the job, streams the email to **Gemini 2.0 Flash**, and updates the database with categories, summaries, and extracted tasks. The UI instantly updates via optimistic UI patterns in Next.js.
 
 ### 2. Semantic Search & RAG (Retrieval-Augmented Generation)
-MailPilot moves beyond traditional keyword search. Every incoming email is passed through the `text-embedding-004` model to generate a **768-dimensional vector embedding**. 
+MailPilot moves beyond traditional keyword search. Every incoming email is passed through the `gemini-embedding-001` model to generate a **768-dimensional vector embedding**. 
 
 These embeddings are stored directly in PostgreSQL using the **`pgvector`** extension. When a user asks a question in the Chat UI (e.g., *"What is my flight tracking number?"*), the query is embedded, and a fast cosine-similarity search (`<=>`) retrieves the exact emails. These emails are then injected as context into a Gemini prompt to generate a highly accurate, grounded answer.
 
@@ -99,7 +99,7 @@ MailPilot was built incrementally over 8 architectural phases:
 - **Vector Database:** Postgres `pgvector` extension
 - **ORM:** Prisma
 - **Background Jobs:** BullMQ + Redis
-- **AI/LLM:** Google Gemini API (`gemini-2.0-flash` & `text-embedding-004`)
+- **AI/LLM:** Google Gemini API (`gemini-2.5-flash` & `gemini-embedding-001`)
 - **Email Provider:** Google Gmail API
 
 ---

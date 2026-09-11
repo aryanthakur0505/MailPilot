@@ -2,7 +2,7 @@
 // MailPilot — Chat API (Phase 8: RAG)
 // ==================================================
 // POST /api/chat
-// 1. Embeds the user's query with Gemini text-embedding-004
+// 1. Embeds the user's query with Gemini gemini-embedding-001 (768 dims)
 // 2. Runs a pgvector cosine similarity search against stored email embeddings
 // 3. Passes the top-5 matching emails as context to Gemini Flash
 // 4. Returns a grounded natural-language answer
