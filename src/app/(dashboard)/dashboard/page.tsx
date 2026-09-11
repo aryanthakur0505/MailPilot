@@ -7,6 +7,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SyncButton } from "@/components/dashboard/SyncButton";
+import { EmailListCard } from "@/components/dashboard/EmailListCard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,61 +20,12 @@ import {
   CheckCircle2,
   ArrowRight,
   Zap,
-  Clock,
   MessageSquare,
   AlertCircle,
   ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
-import { EmailRowAiButton } from "@/components/dashboard/EmailRowAiButton";
 import { cn } from "@/lib/utils";
-
-// -----------------------------------------------------------------------
-// Helper: generate avatar initials + color from a name/email
-// -----------------------------------------------------------------------
-function getAvatar(name: string, email: string) {
-  const initials = name
-    ? name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : email.slice(0, 2).toUpperCase();
-
-  const palettes = [
-    "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400",
-    "bg-violet-500/15 text-violet-600 dark:text-violet-400",
-    "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    "bg-rose-500/15 text-rose-600 dark:text-rose-400",
-    "bg-sky-500/15 text-sky-600 dark:text-sky-400",
-    "bg-pink-500/15 text-pink-600 dark:text-pink-400",
-    "bg-teal-500/15 text-teal-600 dark:text-teal-400",
-  ];
-  const colorIndex = (name.charCodeAt(0) || email.charCodeAt(0) || 0) % palettes.length;
-  return { initials, className: palettes[colorIndex] };
-}
-
-// -----------------------------------------------------------------------
-// Helper: category badge classes
-// -----------------------------------------------------------------------
-function categoryBadgeClass(category: string | null) {
-  switch (category) {
-    case "urgent":
-      return "bg-red-500/10 text-red-600 dark:text-red-400";
-    case "work":
-      return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
-    case "newsletter":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
-    case "personal":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-    case "social":
-      return "bg-pink-500/10 text-pink-600 dark:text-pink-400";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -298,82 +250,24 @@ export default async function DashboardPage() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
           {/* Email list */}
-          <Card className="p-0 lg:col-span-3">
-            <div className="flex items-center justify-between border-b px-5 py-3.5">
-              <div className="flex items-center gap-3">
-                <h2 className="text-sm font-semibold">Inbox</h2>
-                <Badge variant="secondary">{emails.length}</Badge>
-                {unreadCount > 0 && (
+          <div className="lg:col-span-3">
+            <EmailListCard
+              title="Inbox"
+              emails={emails}
+              extraBadges={
+                unreadCount > 0 && (
                   <Badge variant="secondary" className="text-emerald-600 dark:text-emerald-400">
                     {unreadCount} unread
                   </Badge>
-                )}
-              </div>
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Clock size={12} />
-                Newest first
-              </Button>
-            </div>
-
-            <ul>
-              {emails.map((email, i) => {
-                const { initials, className } = getAvatar(email.fromName ?? "", email.from);
-                return (
-                  <li
-                    key={email.id}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-3.5 px-5 py-3.5 transition-colors hover:bg-muted/40",
-                      i < emails.length - 1 && "border-b"
-                    )}
-                  >
-                    <div className="flex w-2 shrink-0 items-center justify-center">
-                      {!email.isRead && <div className="size-1.5 rounded-full bg-primary" />}
-                    </div>
-
-                    <div className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold", className)}>
-                      {initials}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-0.5 flex items-baseline justify-between gap-2">
-                        <span className={cn("truncate text-sm", !email.isRead ? "font-semibold" : "text-muted-foreground")}>
-                          {email.fromName || email.from}
-                        </span>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
-                          {formatDistanceToNow(email.receivedAt, { addSuffix: true })}
-                        </span>
-                      </div>
-                      <p className={cn("truncate text-sm", !email.isRead ? "text-foreground/90 font-medium" : "text-muted-foreground")}>
-                        {email.subject || "(no subject)"}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground/80">{email.snippet}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {email.category && (
-                        <span className={cn("hidden rounded-md px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase sm:block", categoryBadgeClass(email.category))}>
-                          {email.category}
-                        </span>
-                      )}
-
-                      {email.priority !== null && email.priority >= 70 && (
-                        <div className="flex shrink-0 items-center gap-1.5" title={`Priority: ${email.priority}`}>
-                          <div className="size-1.5 animate-pulse rounded-full bg-red-500" />
-                          <span className="hidden text-[10px] font-bold text-red-500 sm:block">URGENT</span>
-                        </div>
-                      )}
-
-                      <EmailRowAiButton emailId={email.id} />
-                    </div>
-
-                    {email.isStarred && (
-                      <Star size={13} className="shrink-0 fill-amber-400 text-amber-400" />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
+                )
+              }
+              emptyState={{
+                icon: <Inbox size={24} className="text-muted-foreground" strokeWidth={1.5} />,
+                title: "No emails yet",
+                description: "Sync your mailbox to see your inbox here.",
+              }}
+            />
+          </div>
 
           {/* Right panel */}
           <div className="flex flex-col gap-6 lg:col-span-2">

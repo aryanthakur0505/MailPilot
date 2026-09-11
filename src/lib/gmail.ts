@@ -110,19 +110,23 @@ function extractBody(payload: {
 }
 
 // -----------------------------------------------------------------------
-// Fetch and parse the latest N emails from INBOX
+// Fetch and parse the latest N messages carrying a given Gmail label.
+// Used for INBOX, SENT, and DRAFT — same message shape either way, so
+// one implementation covers all three instead of duplicating the
+// list+batch-fetch+parse logic per label.
 // -----------------------------------------------------------------------
-export async function fetchInboxEmails(
+export async function fetchEmailsByLabel(
   accessToken: string,
   refreshToken: string,
+  labelId: "INBOX" | "SENT" | "DRAFT",
   maxResults = 50
 ): Promise<ParsedEmail[]> {
   const gmail = getGmailClient(accessToken, refreshToken);
 
-  // Step 1: Get message IDs from INBOX
+  // Step 1: Get message IDs carrying this label
   const listRes = await gmail.users.messages.list({
     userId: "me",
-    labelIds: ["INBOX"],
+    labelIds: [labelId],
     maxResults,
   });
 
@@ -173,6 +177,18 @@ export async function fetchInboxEmails(
   }
 
   return parsed;
+}
+
+// -----------------------------------------------------------------------
+// Back-compat wrapper — fetchInboxEmails was the original, single-label
+// entry point; kept so existing call sites don't need to change.
+// -----------------------------------------------------------------------
+export function fetchInboxEmails(
+  accessToken: string,
+  refreshToken: string,
+  maxResults = 50
+): Promise<ParsedEmail[]> {
+  return fetchEmailsByLabel(accessToken, refreshToken, "INBOX", maxResults);
 }
 
 // -----------------------------------------------------------------------

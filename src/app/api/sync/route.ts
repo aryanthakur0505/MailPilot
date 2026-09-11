@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { fetchInboxEmails } from "@/lib/gmail";
+import { fetchEmailsByLabel, type ParsedEmail } from "@/lib/gmail";
 import { emailQueue } from "@/lib/queue";
 
 export async function POST() {
@@ -54,14 +54,26 @@ export async function POST() {
     },
   });
 
-  // 4. Fetch emails from Gmail API
-  let emails;
+  // 4. Fetch emails from Gmail API — INBOX for the main list, plus SENT and
+  // DRAFT so the /dashboard/sent and /dashboard/drafts pages have real data
+  // to show (previously only INBOX was ever synced; those two pages 404'd
+  // because no page existed for them, but even a page would have had
+  // nothing to query). Smaller caps on Sent/Draft since they're
+  // secondary views, not the primary triage surface.
+  let emails: ParsedEmail[];
   try {
-    emails = await fetchInboxEmails(
-      account.access_token,
-      account.refresh_token,
-      50
-    );
+    const [inbox, sent, drafts] = await Promise.all([
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "INBOX", 50),
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "SENT", 30),
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "DRAFT", 20),
+    ]);
+    // A message can carry more than one of these labels (rare, but possible);
+    // dedupe by gmailId so it isn't processed/upserted twice in this run.
+    const byGmailId = new Map<string, ParsedEmail>();
+    for (const email of [...inbox, ...sent, ...drafts]) {
+      byGmailId.set(email.gmailId, email);
+    }
+    emails = [...byGmailId.values()];
   } catch (err) {
     console.error("[sync] Gmail API error:", err);
     return NextResponse.json(
@@ -71,7 +83,7 @@ export async function POST() {
   }
 
   if (emails.length === 0) {
-    return NextResponse.json({ synced: 0, message: "Inbox is empty." });
+    return NextResponse.json({ synced: 0, message: "No emails found." });
   }
 
   // 5. Upsert threads and emails into the database
@@ -130,21 +142,29 @@ export async function POST() {
 
     syncedCount++;
 
-    // Enqueue AI processing jobs for this email
+    // Enqueue AI processing jobs — only for INBOX mail. Categorizing or
+    // extracting tasks from your own sent replies/drafts isn't meaningful
+    // (you already know what you sent), and it would burn through the
+    // Gemini free-tier rate limit for no benefit. Embeddings are the
+    // exception: indexing sent/draft content too makes chat/RAG search
+    // actually useful across everything, not just inbound mail.
+    const isInbox = email.labels.includes("INBOX");
     try {
-      await emailQueue.add("categorize-email", {
-        type: "categorize-email",
-        userId,
-        payload: { emailId: upsertedEmail.id },
-      });
-      // Phase 4: extract action items — the worker has always handled this job type,
-      // but nothing ever enqueued one, so task extraction was silently dead.
-      await emailQueue.add("extract-tasks", {
-        type: "extract-tasks",
-        userId,
-        payload: { emailId: upsertedEmail.id },
-      });
-      // Phase 8: also enqueue embedding generation for semantic search
+      if (isInbox) {
+        await emailQueue.add("categorize-email", {
+          type: "categorize-email",
+          userId,
+          payload: { emailId: upsertedEmail.id },
+        });
+        // Phase 4: extract action items — the worker has always handled this job type,
+        // but nothing ever enqueued one, so task extraction was silently dead.
+        await emailQueue.add("extract-tasks", {
+          type: "extract-tasks",
+          userId,
+          payload: { emailId: upsertedEmail.id },
+        });
+      }
+      // Phase 8: embedding generation for semantic search — all mail, inbox or not
       await emailQueue.add("generate-embedding", {
         type: "generate-embedding",
         userId,
