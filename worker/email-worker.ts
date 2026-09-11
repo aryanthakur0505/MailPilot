@@ -289,7 +289,13 @@ const worker = new Worker<EmailJobData>(
   },
   {
     connection,
-    concurrency: 3, // Process up to 3 emails at once
+    // The Gemini free tier caps generateContent at 15 requests/minute per model
+    // (categorize-email and extract-tasks both call it). Concurrency 3 blew through
+    // that instantly on a backlog, and jobs exhausted their retry attempts (see
+    // queue.ts) faster than Google's ~60s cooldown, landing in "failed" permanently
+    // instead of eventually succeeding. concurrency: 1 keeps this comfortably under
+    // the free-tier ceiling; bump it back up once on a paid tier with real quota.
+    concurrency: 1,
   }
 );
 

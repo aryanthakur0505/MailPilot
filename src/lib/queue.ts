@@ -31,10 +31,14 @@ export const connection = getRedisConnection();
 export const emailQueue = new Queue("email-processing", {
   connection,
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 5,
+    // Gemini free-tier 429s ask for up to ~60s before retrying (see the worker's
+    // concurrency comment). Exponential from a 5s base (5s/10s/20s/40s/80s) gives
+    // retries a real chance of landing after the quota window actually clears,
+    // instead of burning all attempts in the first few seconds.
     backoff: {
       type: "exponential",
-      delay: 1000,
+      delay: 5000,
     },
     removeOnComplete: { count: 100 },
     removeOnFail: { count: 50 },
