@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint",
-    "worker": "tsx --env-file=.env.local worker/email-worker.ts"
+    "worker:dev": "tsx --env-file=.env.local worker/email-worker.ts",
+    "build:worker": "tsup worker/email-worker.ts --format cjs --clean",
+    "worker:prod": "node dist/email-worker.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -41,6 +43,7 @@
     "eslint-config-next": "16.2.11",
     "prisma": "6.19.3",
     "tailwindcss": "^4",
+    "tsup": "^8.5.1",
     "tsx": "^4.23.1",
     "typescript": "^5"
   }

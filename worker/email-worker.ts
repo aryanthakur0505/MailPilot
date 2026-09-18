@@ -319,4 +319,17 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
+// ── Dummy HTTP Server for Render Free Tier ──────────────────────
+// Render only offers a free tier for "Web Services" (which require an open port),
+// not "Background Workers". This dummy server listens on the required port and
+// returns 200 OK, tricking Render into hosting this worker on the free tier!
+import http from "http";
+const PORT = process.env.PORT || 8080;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("MailPilot Worker is healthy!");
+}).listen(PORT, () => {
+  console.log(`[worker] Dummy HTTP server listening on port ${PORT} (for Render health checks)`);
+});
+
 console.log("[worker] Ready. Waiting for jobs...");
