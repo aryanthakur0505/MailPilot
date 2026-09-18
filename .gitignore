@@ -15,6 +15,10 @@
 # production
 /build
 
+# worker build output — tsup regenerates this on every Render deploy
+# (render.yaml: npm run build:worker), so committing it is redundant
+/dist
+
 # misc
 .DS_Store
 *.pem

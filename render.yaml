@@ -22,7 +22,11 @@ services:
       - key: NEXT_PUBLIC_APP_URL
         sync: false
 
-  - type: worker
+  # Declared as "web", not Render's native "worker" type — that native type
+  # has no free tier regardless of whether the process opens a port, which
+  # defeats the dummy HTTP server in worker/email-worker.ts (see its own
+  # comment) that exists specifically to pass as a free-tier web service.
+  - type: web
     name: mailpilot-worker
     env: node
     buildCommand: npm install && npm run build:worker
