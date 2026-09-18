@@ -2,7 +2,7 @@ services:
   - type: web
     name: mailpilot-web
     env: node
-    buildCommand: npx prisma db push && npm run build
+    buildCommand: npm ci && npx prisma@6.19.3 db push && npm run build
     startCommand: npm run start
     envVars:
       - key: DATABASE_URL
