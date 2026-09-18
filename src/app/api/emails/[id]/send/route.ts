@@ -20,6 +20,7 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const { id: emailId } = await params;
   const { draftId } = await req.json() as { draftId: string };
@@ -79,7 +80,15 @@ export async function POST(
         subject: draft.subject ?? `Re: ${email.subject ?? ""}`,
         body: draft.body,
         threadId: email.thread.gmailThreadId, // Keep in the same Gmail thread
-      }
+      },
+      (tokens) =>
+        prisma.account.updateMany({
+          where: { userId, provider: "google" },
+          data: {
+            ...(tokens.access_token ? { access_token: tokens.access_token } : {}),
+            ...(tokens.refresh_token ? { refresh_token: tokens.refresh_token } : {}),
+          },
+        })
     );
 
     // 5. Mark the draft as sent

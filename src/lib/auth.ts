@@ -18,9 +18,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          // Phase 2: Gmail readonly scope for email sync
+          // gmail.modify (not readonly): covers everything readonly does, plus
+          // messages.modify and messages.send — needed by the Rules engine
+          // (archive/markRead/addLabel, worker/email-worker.ts) and by
+          // Compose/Reply-send (lib/gmail.ts sendGmailEmail). Readonly alone
+          // silently 403'd every one of those at Google's API, regardless of
+          // the app's own code. prompt:"consent" below means anyone already
+          // connected just needs to sign out and back in once to pick up the
+          // broader grant — no separate re-authorization flow needed.
           scope:
-            "openid email profile https://www.googleapis.com/auth/gmail.readonly",
+            "openid email profile https://www.googleapis.com/auth/gmail.modify",
           access_type: "offline",
           prompt: "consent",
         },
@@ -59,6 +66,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             access_token: account.access_token,
             refresh_token: account.refresh_token,
             expires_at: account.expires_at,
+            // Previously omitted, so this column went stale after the very
+            // first sign-in — every later re-consent (e.g. this scope
+            // change) updated the real token but left the DB claiming the
+            // old, narrower scope was still all that had been granted.
+            scope: account.scope,
           },
         });
       }

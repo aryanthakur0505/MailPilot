@@ -84,6 +84,19 @@ const worker = new Worker<EmailJobData>(
             access_token: account.access_token,
             refresh_token: account.refresh_token ?? undefined,
           });
+          auth.on("tokens", (tokens) => {
+            if (tokens.access_token || tokens.refresh_token) {
+              prisma.account
+                .updateMany({
+                  where: { userId, provider: "google" },
+                  data: {
+                    ...(tokens.access_token ? { access_token: tokens.access_token } : {}),
+                    ...(tokens.refresh_token ? { refresh_token: tokens.refresh_token } : {}),
+                  },
+                })
+                .catch((err) => console.error("[worker] Failed to persist refreshed token:", err));
+            }
+          });
           const gmail = google.gmail({ version: "v1", auth });
 
           for (const rule of matchedRules) {
@@ -224,7 +237,15 @@ const worker = new Worker<EmailJobData>(
       const sentEmails = await fetchSentEmails(
         account.access_token,
         account.refresh_token,
-        30
+        30,
+        (tokens) =>
+          prisma.account.updateMany({
+            where: { userId, provider: "google" },
+            data: {
+              ...(tokens.access_token ? { access_token: tokens.access_token } : {}),
+              ...(tokens.refresh_token ? { refresh_token: tokens.refresh_token } : {}),
+            },
+          })
       );
 
       if (sentEmails.length === 0) {

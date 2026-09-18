@@ -60,12 +60,24 @@ export async function POST() {
   // because no page existed for them, but even a page would have had
   // nothing to query). Smaller caps on Sent/Draft since they're
   // secondary views, not the primary triage surface.
+  // googleapis refreshes an expired access_token in-memory on demand; persist
+  // it back so later calls (this sync and future ones) reuse the fresh token
+  // instead of paying a refresh round-trip every time.
+  const persistRefreshedTokens = (tokens: { access_token?: string | null; refresh_token?: string | null }) =>
+    prisma.account.updateMany({
+      where: { userId, provider: "google" },
+      data: {
+        ...(tokens.access_token ? { access_token: tokens.access_token } : {}),
+        ...(tokens.refresh_token ? { refresh_token: tokens.refresh_token } : {}),
+      },
+    });
+
   let emails: ParsedEmail[];
   try {
     const [inbox, sent, drafts] = await Promise.all([
-      fetchEmailsByLabel(account.access_token, account.refresh_token, "INBOX", 50),
-      fetchEmailsByLabel(account.access_token, account.refresh_token, "SENT", 30),
-      fetchEmailsByLabel(account.access_token, account.refresh_token, "DRAFT", 20),
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "INBOX", 50, persistRefreshedTokens),
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "SENT", 30, persistRefreshedTokens),
+      fetchEmailsByLabel(account.access_token, account.refresh_token, "DRAFT", 20, persistRefreshedTokens),
     ]);
     // A message can carry more than one of these labels (rare, but possible);
     // dedupe by gmailId so it isn't processed/upserted twice in this run.

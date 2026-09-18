@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
 
   const { to, subject, body } = (await req.json()) as {
     to?: string;
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   // Retrieve the user's OAuth tokens from their Google account
   const account = await prisma.account.findFirst({
-    where: { userId: session.user.id, provider: "google" },
+    where: { userId, provider: "google" },
     select: { access_token: true, refresh_token: true },
   });
 
@@ -60,7 +61,15 @@ export async function POST(req: NextRequest) {
         subject: subject?.trim() || "(no subject)",
         body: body.trim(),
         // no threadId — this is a new conversation, not a reply
-      }
+      },
+      (tokens) =>
+        prisma.account.updateMany({
+          where: { userId, provider: "google" },
+          data: {
+            ...(tokens.access_token ? { access_token: tokens.access_token } : {}),
+            ...(tokens.refresh_token ? { refresh_token: tokens.refresh_token } : {}),
+          },
+        })
     );
 
     return NextResponse.json({ success: true, messageId });

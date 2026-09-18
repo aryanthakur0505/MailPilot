@@ -7,9 +7,29 @@
 import { google } from "googleapis";
 
 // -----------------------------------------------------------------------
+// Refreshed-token persistence callback — googleapis transparently
+// refreshes an expired access_token on any request using the stored
+// refresh_token, but only in-memory on that OAuth2Client instance.
+// Without this, the refreshed token is thrown away and every call after
+// the original token's ~1hr expiry pays a refresh round-trip again
+// instead of reusing a cached fresh one. Callers pass their own
+// persistence logic (rather than gmail.ts importing Prisma directly)
+// since this module is shared between the Next.js app and the standalone
+// worker process, which use separate Prisma client setups.
+// -----------------------------------------------------------------------
+export type OnTokenRefresh = (tokens: {
+  access_token?: string | null;
+  refresh_token?: string | null;
+}) => unknown;
+
+// -----------------------------------------------------------------------
 // Build an authenticated OAuth2 client from stored tokens
 // -----------------------------------------------------------------------
-export function getGmailClient(accessToken: string, refreshToken: string) {
+export function getGmailClient(
+  accessToken: string,
+  refreshToken: string,
+  onTokenRefresh?: OnTokenRefresh
+) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -20,6 +40,21 @@ export function getGmailClient(accessToken: string, refreshToken: string) {
     access_token: accessToken,
     refresh_token: refreshToken,
   });
+
+  if (onTokenRefresh) {
+    oauth2Client.on("tokens", (tokens) => {
+      // Google only includes refresh_token here on the rare occasions it
+      // rotates it — access_token is present on every refresh.
+      if (tokens.access_token || tokens.refresh_token) {
+        Promise.resolve(
+          onTokenRefresh({
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+          })
+        ).catch((err) => console.error("[gmail] Failed to persist refreshed token:", err));
+      }
+    });
+  }
 
   return google.gmail({ version: "v1", auth: oauth2Client });
 }
@@ -119,9 +154,10 @@ export async function fetchEmailsByLabel(
   accessToken: string,
   refreshToken: string,
   labelId: "INBOX" | "SENT" | "DRAFT",
-  maxResults = 50
+  maxResults = 50,
+  onTokenRefresh?: OnTokenRefresh
 ): Promise<ParsedEmail[]> {
-  const gmail = getGmailClient(accessToken, refreshToken);
+  const gmail = getGmailClient(accessToken, refreshToken, onTokenRefresh);
 
   // Step 1: Get message IDs carrying this label
   const listRes = await gmail.users.messages.list({
@@ -186,9 +222,10 @@ export async function fetchEmailsByLabel(
 export function fetchInboxEmails(
   accessToken: string,
   refreshToken: string,
-  maxResults = 50
+  maxResults = 50,
+  onTokenRefresh?: OnTokenRefresh
 ): Promise<ParsedEmail[]> {
-  return fetchEmailsByLabel(accessToken, refreshToken, "INBOX", maxResults);
+  return fetchEmailsByLabel(accessToken, refreshToken, "INBOX", maxResults, onTokenRefresh);
 }
 
 // -----------------------------------------------------------------------
@@ -202,9 +239,10 @@ export async function sendGmailEmail(
     subject: string;
     body: string;
     threadId?: string; // pass to keep it in the same Gmail thread
-  }
+  },
+  onTokenRefresh?: OnTokenRefresh
 ): Promise<{ messageId: string }> {
-  const gmail = getGmailClient(accessToken, refreshToken);
+  const gmail = getGmailClient(accessToken, refreshToken, onTokenRefresh);
 
   // Build RFC 2822 MIME message
   const mimeLines = [
@@ -238,9 +276,10 @@ export async function sendGmailEmail(
 export async function fetchSentEmails(
   accessToken: string,
   refreshToken: string,
-  maxResults = 30
+  maxResults = 30,
+  onTokenRefresh?: OnTokenRefresh
 ): Promise<{ subject: string; body: string }[]> {
-  const gmail = getGmailClient(accessToken, refreshToken);
+  const gmail = getGmailClient(accessToken, refreshToken, onTokenRefresh);
 
   const listRes = await gmail.users.messages.list({
     userId: "me",
